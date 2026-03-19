@@ -446,7 +446,8 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
+        'mcp__brave-search__*'
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -460,6 +461,13 @@ async function runQuery(
             NANOCLAW_CHAT_JID: containerInput.chatJid,
             NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+          },
+        },
+        'brave-search': {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-brave-search'],
+          env: {
+            BRAVE_API_KEY: sdkEnv.BRAVE_API_KEY || '',
           },
         },
       },
