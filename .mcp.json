@@ -1,3 +1,12 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "dbhub": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bytebase/dbhub@0.17.0"],
+      "env": {
+        "DSN": "sqlite://${PWD}/store/messages.db"
+      }
+    }
+  }
 }
