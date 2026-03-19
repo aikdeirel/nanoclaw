@@ -12,6 +12,12 @@ vi.mock('../env.js', () => ({ readEnvFile: vi.fn(() => ({})) }));
 vi.mock('../config.js', () => ({
   ASSISTANT_NAME: 'Andy',
   TRIGGER_PATTERN: /^@Andy\b/i,
+  GROUPS_DIR: '/tmp/test-groups',
+}));
+
+// Mock image processing
+vi.mock('../image.js', () => ({
+  processImage: vi.fn().mockRejectedValue(new Error('mock: no image processing in tests')),
 }));
 
 // Mock logger
@@ -153,7 +159,11 @@ function createMediaCtx(overrides: {
       date: overrides.date ?? Math.floor(Date.now() / 1000),
       message_id: overrides.messageId ?? 1,
       caption: overrides.caption,
+      photo: [{ file_id: 'file-small' }, { file_id: 'file-large' }],
       ...(overrides.extra || {}),
+    },
+    api: {
+      getFile: vi.fn().mockRejectedValue(new Error('mock: getFile not available')),
     },
     me: { username: 'andy_ai_bot' },
   };
