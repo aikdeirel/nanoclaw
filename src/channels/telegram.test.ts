@@ -17,7 +17,9 @@ vi.mock('../config.js', () => ({
 
 // Mock image processing
 vi.mock('../image.js', () => ({
-  processImage: vi.fn().mockRejectedValue(new Error('mock: no image processing in tests')),
+  processImage: vi
+    .fn()
+    .mockRejectedValue(new Error('mock: no image processing in tests')),
 }));
 
 // Mock logger
@@ -163,7 +165,9 @@ function createMediaCtx(overrides: {
       ...(overrides.extra || {}),
     },
     api: {
-      getFile: vi.fn().mockRejectedValue(new Error('mock: getFile not available')),
+      getFile: vi
+        .fn()
+        .mockRejectedValue(new Error('mock: getFile not available')),
     },
     me: { username: 'andy_ai_bot' },
   };
