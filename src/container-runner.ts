@@ -44,12 +44,10 @@ export interface ContainerInput {
   imageAttachments?: Array<{ relativePath: string; mediaType: string }>;
 }
 
-export interface ContainerOutput {
-  status: 'success' | 'error';
-  result: string | null;
-  newSessionId?: string;
-  error?: string;
-}
+export type ContainerOutput =
+  | { type: 'result'; status: 'success'; result: string | null; newSessionId?: string }
+  | { type: 'result'; status: 'error'; error: string; result?: string | null; newSessionId?: string }
+  | { type: 'status'; agentName: string; text: string };
 
 interface VolumeMount {
   hostPath: string;
@@ -360,7 +358,7 @@ export async function runContainerAgent(
 
           try {
             const parsed: ContainerOutput = JSON.parse(jsonStr);
-            if (parsed.newSessionId) {
+            if (parsed.type === 'result' && parsed.newSessionId) {
               newSessionId = parsed.newSessionId;
             }
             hadStreamingOutput = true;
@@ -463,6 +461,7 @@ export async function runContainerAgent(
           );
           outputChain.then(() => {
             resolve({
+              type: 'result',
               status: 'success',
               result: null,
               newSessionId,
@@ -477,6 +476,7 @@ export async function runContainerAgent(
         );
 
         resolve({
+          type: 'result',
           status: 'error',
           result: null,
           error: `Container timed out after ${configTimeout}ms`,
@@ -556,6 +556,7 @@ export async function runContainerAgent(
         );
 
         resolve({
+          type: 'result',
           status: 'error',
           result: null,
           error: `Container exited with code ${code}: ${stderr.slice(-200)}`,
@@ -571,6 +572,7 @@ export async function runContainerAgent(
             'Container completed (streaming mode)',
           );
           resolve({
+            type: 'result',
             status: 'success',
             result: null,
             newSessionId,
@@ -602,8 +604,8 @@ export async function runContainerAgent(
           {
             group: group.name,
             duration,
-            status: output.status,
-            hasResult: !!output.result,
+            status: output.type === 'result' ? output.status : undefined,
+            hasResult: output.type === 'result' ? !!output.result : false,
           },
           'Container completed',
         );
@@ -621,6 +623,7 @@ export async function runContainerAgent(
         );
 
         resolve({
+          type: 'result',
           status: 'error',
           result: null,
           error: `Failed to parse container output: ${err instanceof Error ? err.message : String(err)}`,
@@ -635,6 +638,7 @@ export async function runContainerAgent(
         'Container spawn error',
       );
       resolve({
+        type: 'result',
         status: 'error',
         result: null,
         error: `Container spawn error: ${err.message}`,
