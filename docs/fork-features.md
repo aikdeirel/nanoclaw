@@ -77,3 +77,12 @@ When a Telegram photo is received, the channel downloads the full-resolution ima
 
 **Relevant files:** `src/channels/telegram.ts` (photo message handler), `src/image.ts`
 **Type:** Extends the Telegram channel — uses the existing image processing utility.
+
+---
+
+## 9. VPS Setup & Update Skills
+
+Two Claude Code skills for managing NanoClaw on a remote Hetzner VPS. `/vps-setup` walks through provisioning a fresh Ubuntu 24.04 server (SSH keys, firewall, Docker, nvm, clone, `.env`, systemd service). `/vps-update` handles syncing local data (auth credentials, groups, `.env`) to the VPS via rsync and optionally pulling new code, rebuilding, and restarting the service.
+
+**Relevant files:** `.claude/skills/vps-setup/SKILL.md`, `.claude/skills/vps-update/SKILL.md`
+**Type:** New skills — operational tooling, no changes to runtime code.
