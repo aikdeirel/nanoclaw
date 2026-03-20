@@ -63,6 +63,7 @@ beforeEach(() => {
     getAvailableGroups: () => [],
     writeGroupsSnapshot: () => {},
     onTasksChanged: () => {},
+    setRegisteredGroupModel: () => {},
   };
 });
 
@@ -633,6 +634,117 @@ describe('schedule_task context_mode', () => {
 
     const tasks = getAllTasks();
     expect(tasks[0].context_mode).toBe('isolated');
+  });
+});
+
+// --- set_model ---
+
+describe('processTaskIpc set_model', () => {
+  it('updates model for own group', async () => {
+    let calledWith: { folder: string; model: string | null } | undefined;
+
+    const localDeps: IpcDeps = {
+      sendMessage: async () => {},
+      registeredGroups: () => ({}),
+      registerGroup: () => {},
+      syncGroups: async () => {},
+      getAvailableGroups: () => [],
+      writeGroupsSnapshot: () => {},
+      onTasksChanged: () => {},
+      setRegisteredGroupModel: (folder: string, model: string | null) => {
+        calledWith = { folder, model };
+      },
+    };
+
+    await processTaskIpc(
+      { type: 'set_model', model: 'claude-opus-4-6', groupFolder: 'telegram_main' },
+      'telegram_main',
+      false,
+      localDeps,
+    );
+
+    expect(calledWith).toEqual({ folder: 'telegram_main', model: 'claude-opus-4-6' });
+  });
+
+  it('main can set model for another group via targetFolder', async () => {
+    let calledWith: { folder: string; model: string | null } | undefined;
+
+    const localDeps: IpcDeps = {
+      sendMessage: async () => {},
+      registeredGroups: () => ({}),
+      registerGroup: () => {},
+      syncGroups: async () => {},
+      getAvailableGroups: () => [],
+      writeGroupsSnapshot: () => {},
+      onTasksChanged: () => {},
+      setRegisteredGroupModel: (folder: string, model: string | null) => {
+        calledWith = { folder, model };
+      },
+    };
+
+    await processTaskIpc(
+      { type: 'set_model', model: 'claude-haiku-4-5', targetFolder: 'telegram_other', groupFolder: 'main' },
+      'main',
+      true,
+      localDeps,
+    );
+
+    expect(calledWith).toEqual({ folder: 'telegram_other', model: 'claude-haiku-4-5' });
+  });
+
+  it('non-main cannot target another group', async () => {
+    let calledWith: { folder: string; model: string | null } | undefined;
+
+    const localDeps: IpcDeps = {
+      sendMessage: async () => {},
+      registeredGroups: () => ({}),
+      registerGroup: () => {},
+      syncGroups: async () => {},
+      getAvailableGroups: () => [],
+      writeGroupsSnapshot: () => {},
+      onTasksChanged: () => {},
+      setRegisteredGroupModel: (folder: string, model: string | null) => {
+        calledWith = { folder, model };
+      },
+    };
+
+    await processTaskIpc(
+      { type: 'set_model', model: 'claude-opus-4-6', targetFolder: 'telegram_other', groupFolder: 'telegram_main' },
+      'telegram_main',
+      false,
+      localDeps,
+    );
+
+    // targetFolder ignored for non-main; updates own group
+    expect(calledWith).toEqual({ folder: 'telegram_main', model: 'claude-opus-4-6' });
+  });
+
+  it('resets to null when model is null (MCP tool converts "default" → null before writing IPC)', async () => {
+    let calledWith: { folder: string; model: string | null } | undefined;
+
+    const localDeps: IpcDeps = {
+      sendMessage: async () => {},
+      registeredGroups: () => ({}),
+      registerGroup: () => {},
+      syncGroups: async () => {},
+      getAvailableGroups: () => [],
+      writeGroupsSnapshot: () => {},
+      onTasksChanged: () => {},
+      setRegisteredGroupModel: (folder: string, model: string | null) => {
+        calledWith = { folder, model };
+      },
+    };
+
+    // The MCP tool translates "default" → null before writing the IPC file,
+    // so by the time the IPC handler sees it, null already means "reset to default".
+    await processTaskIpc(
+      { type: 'set_model', model: null, groupFolder: 'telegram_main' },
+      'telegram_main',
+      false,
+      localDeps,
+    );
+
+    expect(calledWith).toEqual({ folder: 'telegram_main', model: null });
   });
 });
 

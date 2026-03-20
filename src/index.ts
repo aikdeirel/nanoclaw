@@ -38,6 +38,7 @@ import {
   getNewMessages,
   getRouterState,
   initDatabase,
+  setGroupModel,
   setRegisteredGroup,
   setRouterState,
   setSession,
@@ -889,6 +890,11 @@ async function main(): Promise<void> {
       for (const group of Object.values(registeredGroups)) {
         writeTasksSnapshot(group.folder, group.isMain === true, taskRows);
       }
+    },
+    setRegisteredGroupModel: (folder: string, model: string | null) => {
+      setGroupModel(folder, model);
+      // Refresh in-memory groups map
+      registeredGroups = getAllRegisteredGroups();
     },
   });
   queue.setProcessMessagesFn(processGroupMessages);

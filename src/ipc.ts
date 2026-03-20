@@ -24,6 +24,7 @@ export interface IpcDeps {
     registeredJids: Set<string>,
   ) => void;
   onTasksChanged: () => void;
+  setRegisteredGroupModel(folder: string, model: string | null): void;
 }
 
 let ipcWatcherRunning = false;
@@ -182,6 +183,9 @@ export async function processTaskIpc(
     trigger?: string;
     requiresTrigger?: boolean;
     containerConfig?: RegisteredGroup['containerConfig'];
+    // For set_model
+    model?: string | null;
+    targetFolder?: string;
   },
   sourceGroup: string, // Verified identity from IPC directory
   isMain: boolean, // Verified from directory path
@@ -464,6 +468,14 @@ export async function processTaskIpc(
         );
       }
       break;
+
+    case 'set_model': {
+      // Main can target any group; others can only update their own
+      const targetFolder =
+        isMain && data.targetFolder ? data.targetFolder : sourceGroup;
+      deps.setRegisteredGroupModel(targetFolder, data.model ?? null);
+      break;
+    }
 
     default:
       logger.warn({ type: data.type }, 'Unknown IPC task type');
