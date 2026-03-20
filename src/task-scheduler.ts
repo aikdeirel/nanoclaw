@@ -183,6 +183,7 @@ async function runTask(
       (proc, containerName) =>
         deps.onProcess(task.chat_jid, proc, containerName, task.group_folder),
       async (streamedOutput: ContainerOutput) => {
+        if (streamedOutput.type === 'status') return;
         if (streamedOutput.result) {
           result = streamedOutput.result;
           // Forward result to user (sendMessage handles formatting)
@@ -201,11 +202,13 @@ async function runTask(
 
     if (closeTimer) clearTimeout(closeTimer);
 
-    if (output.status === 'error') {
-      error = output.error || 'Unknown error';
-    } else if (output.result) {
-      // Result was already forwarded to the user via the streaming callback above
-      result = output.result;
+    if (output.type === 'result') {
+      if (output.status === 'error') {
+        error = output.error || 'Unknown error';
+      } else if (output.result) {
+        // Result was already forwarded to the user via the streaming callback above
+        result = output.result;
+      }
     }
 
     logger.info(

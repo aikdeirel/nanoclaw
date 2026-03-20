@@ -188,7 +188,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       setTyping: (typing) =>
         channel.setTyping?.(chatJid, typing) ?? Promise.resolve(),
       runAgent: (prompt, onOutput) =>
-        runAgent(group, prompt, chatJid, [], onOutput),
+        runAgent(group, prompt, chatJid, [], async (output) => {
+          if (output.type === 'status') return;
+          await onOutput(output);
+        }),
       closeStdin: () => queue.closeStdin(chatJid),
       advanceCursor: (ts) => {
         lastAgentTimestamp[chatJid] = ts;
@@ -263,6 +266,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     chatJid,
     imageAttachments,
     async (result) => {
+      // Status events are handled by StatusBubble (added in next task)
+      if (result.type === 'status') return;
       // Streaming output callback — called for each agent result
       if (result.result) {
         const raw =
@@ -357,6 +362,10 @@ async function runAgent(
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
     ? async (output: ContainerOutput) => {
+        if (output.type === 'status') {
+          await onOutput(output);
+          return;
+        }
         if (output.newSessionId) {
           sessions[group.folder] = output.newSessionId;
           setSession(group.folder, output.newSessionId);
@@ -382,17 +391,19 @@ async function runAgent(
       wrappedOnOutput,
     );
 
-    if (output.newSessionId) {
-      sessions[group.folder] = output.newSessionId;
-      setSession(group.folder, output.newSessionId);
-    }
+    if (output.type === 'result') {
+      if (output.newSessionId) {
+        sessions[group.folder] = output.newSessionId;
+        setSession(group.folder, output.newSessionId);
+      }
 
-    if (output.status === 'error') {
-      logger.error(
-        { group: group.name, error: output.error },
-        'Container agent error',
-      );
-      return 'error';
+      if (output.status === 'error') {
+        logger.error(
+          { group: group.name, error: output.error },
+          'Container agent error',
+        );
+        return 'error';
+      }
     }
 
     return 'success';
