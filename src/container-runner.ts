@@ -41,12 +41,24 @@ export interface ContainerInput {
   isMain: boolean;
   isScheduledTask?: boolean;
   assistantName?: string;
+  model?: string;
   imageAttachments?: Array<{ relativePath: string; mediaType: string }>;
 }
 
 export type ContainerOutput =
-  | { type: 'result'; status: 'success'; result: string | null; newSessionId?: string }
-  | { type: 'result'; status: 'error'; error: string; result?: string | null; newSessionId?: string }
+  | {
+      type: 'result';
+      status: 'success';
+      result: string | null;
+      newSessionId?: string;
+    }
+  | {
+      type: 'result';
+      status: 'error';
+      error: string;
+      result?: string | null;
+      newSessionId?: string;
+    }
   | { type: 'status'; agentName: string; text: string };
 
 interface VolumeMount {

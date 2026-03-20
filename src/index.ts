@@ -4,6 +4,7 @@ import path from 'path';
 import {
   ASSISTANT_NAME,
   CREDENTIAL_PROXY_PORT,
+  DEFAULT_MODEL,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
   TELEGRAM_BOT_POOL,
@@ -71,6 +72,63 @@ import { logger } from './logger.js';
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
 
+const FALLBACK_TEXTS = [
+  'Consulting Spirits',
+  'Bribing Neurons',
+  'Googling Internally',
+  'Summoning Wisdom',
+  'Doing Black Magic',
+  'Asking Mom',
+  'Stealing Thoughts',
+  'Caffeinating Brain',
+  'Downloading Smartness',
+  'Poking Hamsters',
+  'Begging ChatGPT',
+  'Warming Braincells',
+  'Sacrificing RAM',
+  'Consulting Crystal Ball',
+  'Waking Interns',
+  'Spinning Wheels',
+  'Vibing Hard',
+  'Overthinking Again',
+  'Panicking Quietly',
+  'Faking Intelligence',
+  'Bribing Servers',
+  'Manifesting Answer',
+  'Buffering Genius',
+  'Screaming Internally',
+  'Asking Aliens',
+  'Pretending Smart',
+  'Yeeting Doubts',
+  'Consulting Wikipedia',
+  'Dusting Neurons',
+  'Microwaving Thoughts',
+  'Stealing WiFi',
+  'Gasping Dramatically',
+  'Rolling Dice',
+  'Guessing Wildly',
+  'Copying Homework',
+  'Sweating Profusely',
+  'Negotiating Reality',
+  'Invoking Demons',
+  'Petting Brain',
+  'Crunching Numbers',
+  'Avoiding Responsibility',
+  'Consulting Horoscope',
+  'Reticulating Splines',
+  'Tickling Servers',
+  'Brewing Nonsense',
+  'Charging Chakras',
+  'Blaming Lag',
+  'Trusting Process',
+  'Faking Confidence',
+  'Praying Silently',
+];
+
+function randomFallback(): string {
+  return FALLBACK_TEXTS[Math.floor(Math.random() * FALLBACK_TEXTS.length)];
+}
+
 class StatusBubble {
   private statuses = new Map<string, string>(); // agentName → current status text
   private messageId: number | null = null;
@@ -79,6 +137,14 @@ class StatusBubble {
     private chatJid: string,
     private telegramChannel: TelegramChannel,
   ) {}
+
+  async init(): Promise<void> {
+    const rendered = `⟳ ${randomFallback()}`;
+    this.messageId = await this.telegramChannel.sendStatusMessage(
+      this.chatJid,
+      rendered,
+    );
+  }
 
   async onStatus(agentName: string, text: string): Promise<void> {
     if (text === '') {
@@ -328,6 +394,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   };
 
   await channel.setTyping?.(chatJid, true);
+  await bubble?.init();
   let hadError = false;
   let outputSentToUser = false;
 
@@ -461,6 +528,7 @@ async function runAgent(
         chatJid,
         isMain,
         assistantName: ASSISTANT_NAME,
+        model: group.model ?? DEFAULT_MODEL,
         ...(imageAttachments.length > 0 && { imageAttachments }),
       },
       (proc, containerName) =>
