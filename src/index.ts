@@ -10,7 +10,7 @@ import {
   TIMEZONE,
   TRIGGER_PATTERN,
 } from './config.js';
-import { initBotPool } from './channels/telegram.js';
+import { TelegramChannel, initBotPool } from './channels/telegram.js';
 import { startCredentialProxy } from './credential-proxy.js';
 import './channels/index.js';
 import {
@@ -70,6 +70,51 @@ import { logger } from './logger.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
+
+class StatusBubble {
+  private statuses = new Map<string, string>(); // agentName → current status text
+  private messageId: number | null = null;
+
+  constructor(
+    private chatJid: string,
+    private telegramChannel: TelegramChannel,
+  ) {}
+
+  async onStatus(agentName: string, text: string): Promise<void> {
+    this.statuses.set(agentName, text);
+    const rendered = this.renderText();
+    if (this.messageId === null) {
+      this.messageId = await this.telegramChannel.sendStatusMessage(this.chatJid, rendered);
+    } else {
+      const result = await this.telegramChannel.editStatusMessage(this.chatJid, this.messageId, rendered);
+      if (result === 'not_found') {
+        this.messageId = null;
+      }
+    }
+  }
+
+  async onAgentDone(agentName: string): Promise<void> {
+    this.statuses.delete(agentName);
+    if (this.statuses.size === 0) {
+      await this.delete();
+    } else if (this.messageId !== null) {
+      await this.telegramChannel.editStatusMessage(this.chatJid, this.messageId, this.renderText());
+    }
+  }
+
+  async delete(): Promise<void> {
+    if (this.messageId !== null) {
+      await this.telegramChannel.deleteStatusMessage(this.chatJid, this.messageId);
+      this.messageId = null;
+    }
+  }
+
+  private renderText(): string {
+    return [...this.statuses.entries()]
+      .map(([name, text]) => `⟳ ${name}: ${text}`)
+      .join('\n');
+  }
+}
 
 let lastTimestamp = '';
 let sessions: Record<string, string> = {};
@@ -164,6 +209,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
     return true;
   }
+
+  const bubble = channel instanceof TelegramChannel
+    ? new StatusBubble(chatJid, channel)
+    : null;
 
   const isMainGroup = group.isMain === true;
 
@@ -266,8 +315,13 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     chatJid,
     imageAttachments,
     async (result) => {
-      // Status events are handled by StatusBubble (added in next task)
-      if (result.type === 'status') return;
+      if (result.type === 'status') {
+        await bubble?.onStatus(result.agentName, result.text);
+        return;
+      }
+      if (result.result !== null) {
+        await bubble?.delete();
+      }
       // Streaming output callback — called for each agent result
       if (result.result) {
         const raw =
@@ -302,6 +356,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   if (idleTimer) clearTimeout(idleTimer);
 
   if (output === 'error' || hadError) {
+    await bubble?.delete();  // Clean up status bubble on error
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
