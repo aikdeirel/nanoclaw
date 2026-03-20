@@ -109,11 +109,14 @@ class StatusBubble {
     if (this.statuses.size === 0) {
       await this.delete();
     } else if (this.messageId !== null) {
-      await this.telegramChannel.editStatusMessage(
+      const result = await this.telegramChannel.editStatusMessage(
         this.chatJid,
         this.messageId,
         this.renderText(),
       );
+      if (result === 'not_found') {
+        this.messageId = null;
+      }
     }
   }
 
