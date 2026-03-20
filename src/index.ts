@@ -432,6 +432,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         resetIdleTimer();
       }
 
+
       if (result.status === 'success') {
         queue.notifyIdle(chatJid);
       }
