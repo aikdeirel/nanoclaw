@@ -333,6 +333,44 @@ Use available_groups.json to find the JID for a group. The folder name must be c
   },
 );
 
+server.tool(
+  'set_model',
+  `Set the Claude model for this group. Takes effect on the next session.
+
+Use this when the user wants to switch the AI model for this conversation group.
+Pass "default" to reset to the system default (claude-sonnet-4-6).`,
+  {
+    model: z.string().describe(
+      'Model ID to use, e.g. "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001". ' +
+      'Pass "default" to reset to the system default.',
+    ),
+    target_folder: z.string().optional().describe(
+      '(Main group only) Folder name of the group to update, e.g. "telegram_main". ' +
+      'Defaults to the current group.',
+    ),
+  },
+  async (args) => {
+    writeIpcFile(TASKS_DIR, {
+      type: 'set_model',
+      model: args.model === 'default' ? null : args.model,
+      targetFolder: args.target_folder,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const target = args.target_folder ?? 'this group';
+    const modelName = args.model === 'default' ? 'system default' : args.model;
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Model for ${target} set to ${modelName}. Takes effect on the next session.`,
+        },
+      ],
+    };
+  },
+);
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);
