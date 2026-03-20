@@ -35,6 +35,8 @@ When completing a new feature or integration that diverges from upstream, update
 | `/update-nanoclaw` | Bring upstream NanoClaw updates into a customized install |
 | `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
 | `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
+| `/vps-setup` | Set up NanoClaw on a fresh Hetzner VPS from scratch |
+| `/vps-update` | Sync data and/or update code on a running VPS installation |
 
 ## Development
 
