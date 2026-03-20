@@ -449,6 +449,11 @@ async function runQuery(
     log(`Additional directories: ${extraDirs.join(', ')}`);
   }
 
+  // Streaming status throttle state (reset per content block via content_block_start)
+  let streamStatusLastText = '';
+  let streamStatusLastEmitLen = 0;
+  const STREAM_THROTTLE_CHARS = 50;
+
   for await (const message of query({
     prompt: stream,
     options: {
@@ -495,6 +500,7 @@ async function runQuery(
       hooks: {
         PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
       },
+      includePartialMessages: true,
     }
   })) {
     messageCount++;
@@ -517,6 +523,54 @@ async function runQuery(
       if (agentName) {
         writeOutput({ type: 'status', agentName, text: '' });
         taskIdToAgentName.delete(tn.task_id);
+      }
+    }
+
+    // Handle streaming partial events for real-time status updates during thinking/generation
+    if (message.type === 'stream_event') {
+      const partial = message as {
+        type: 'stream_event';
+        parent_tool_use_id: string | null;
+        event: {
+          type: string;
+          content_block?: { type: string; name?: string };
+          delta?: { type: string; thinking?: string; text?: string; partial_json?: string };
+        };
+      };
+      const ev = partial.event;
+      // Note: parent_tool_use_id is not yet in toolUseIdToAgentName at stream time
+      // (the assistant event that populates it fires after streaming completes).
+      // Sub-agent stream events therefore always resolve to 'main' — known limitation.
+      const currentAgentName = (partial.parent_tool_use_id && toolUseIdToAgentName.get(partial.parent_tool_use_id)) || 'main';
+
+      if (ev.type === 'content_block_start') {
+        // Reset accumulator on each new content block
+        streamStatusLastText = '';
+        streamStatusLastEmitLen = 0;
+        if (ev.content_block?.type === 'tool_use' && ev.content_block.name) {
+          writeOutput({ type: 'status', agentName: currentAgentName, text: ev.content_block.name });
+        } else if (ev.content_block?.type === 'thinking') {
+          writeOutput({ type: 'status', agentName: currentAgentName, text: '💭 ...' });
+        }
+      }
+
+      if (ev.type === 'content_block_delta' && ev.delta) {
+        const delta = ev.delta;
+        if (delta.type === 'thinking_delta' && delta.thinking) {
+          streamStatusLastText += delta.thinking;
+        } else if (delta.type === 'text_delta' && delta.text) {
+          streamStatusLastText += delta.text;
+        } else if (delta.type === 'input_json_delta' && delta.partial_json) {
+          streamStatusLastText += delta.partial_json;
+        }
+
+        const grown = streamStatusLastText.length - streamStatusLastEmitLen;
+        if (grown >= STREAM_THROTTLE_CHARS) {
+          streamStatusLastEmitLen = streamStatusLastText.length;
+          const snippet = streamStatusLastText.slice(-80); // last 80 chars = most recent context
+          const label = delta.type === 'thinking_delta' ? '💭' : delta.type === 'input_json_delta' ? '⚙️' : '✍️';
+          writeOutput({ type: 'status', agentName: currentAgentName, text: `${label} ${snippet}` });
+        }
       }
     }
 
