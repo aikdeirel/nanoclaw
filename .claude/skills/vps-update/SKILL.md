@@ -23,7 +23,7 @@ Falls Fehler → abbrechen und mit Nutzer klären.
 
 ## Schritt 1: Situation analysieren
 
-Selbstständig prüfen und Ergebnis präsentieren — **vor** der Entscheidung was gemacht werden soll.
+Selbstständig prüfen und Ergebnis präsentieren — **vor** der Entscheidung was gemacht werden soll. Alle Checks parallel ausführen.
 
 ```bash
 # Lokaler Code-Stand
@@ -41,11 +41,39 @@ ls -lh LOCAL_NANOCLAW/store/messages.db
 # VPS DB
 ssh nanoclaw@VPS_IP "ls -lh ~/nanoclaw/store/messages.db 2>/dev/null || echo 'Keine DB auf VPS'"
 
-# Anzahl lokaler Gruppen
-ls LOCAL_NANOCLAW/groups/ 2>/dev/null | wc -l
+# Lokale Gruppen
+ls LOCAL_NANOCLAW/groups/ 2>/dev/null
+
+# VPS Gruppen
+ssh nanoclaw@VPS_IP "ls ~/nanoclaw/groups/ 2>/dev/null || echo 'Keine groups/ auf VPS'"
+
+# Service-Status VPS
+ssh nanoclaw@VPS_IP "systemctl --user is-active nanoclaw"
+
+# Node/npm-Version lokal vs. VPS
+node --version && npm --version
+ssh nanoclaw@VPS_IP "
+  export NVM_DIR=\$HOME/.nvm && source \$NVM_DIR/nvm.sh
+  node --version && npm --version
+"
 ```
 
-Ergebnis zusammenfassen (neue Commits? lokale DB neuer? welche groups/?) und dann fragen:
+Ergebnis als Tabelle zusammenfassen:
+
+| | Lokal | VPS |
+|---|---|---|
+| Letzter Commit | … | … |
+| Commits Unterschied | … hinter VPS / … voraus | — |
+| DB-Größe + Zeitstempel | … | … |
+| Gruppen | … | … |
+| Service-Status | — | active / inactive |
+| Node-Version | … | … |
+
+**Warnungen aktiv einblenden wenn:**
+- VPS-DB ist neuer als lokale DB → „⚠️ VPS-DB ist neuer — Daten-Sync würde Daten überschreiben!"
+- Node-Versionen unterscheiden sich → „⚠️ Node-Version lokal/VPS verschieden — Build-Probleme möglich"
+
+Dann fragen:
 
 > Was soll gemacht werden?
 > 1. **Code-Update** — Git pull, bauen, Service neu starten
@@ -64,19 +92,22 @@ ssh nanoclaw@VPS_IP "systemctl --user stop nanoclaw && systemctl --user is-activ
 ## Schritt 3: Code-Update (Szenarien 1 und 3)
 
 ```bash
-ssh nanoclaw@VPS_IP "bash -l -c '
+ssh nanoclaw@VPS_IP "
+  export NVM_DIR=\$HOME/.nvm && source \$NVM_DIR/nvm.sh
   cd ~/nanoclaw
   git pull origin main
   npm install
   npm run build
   echo Build OK
-'"
+"
 ```
+
+> **Hinweis:** `bash -l` lädt nvm nicht zuverlässig. Immer explizit `source $NVM_DIR/nvm.sh` verwenden.
 
 Container nur neu bauen wenn sich Container-Dateien geändert haben:
 ```bash
-# Prüfen ob container/ Änderungen im Pull enthalten waren:
-ssh nanoclaw@VPS_IP "cd ~/nanoclaw && git diff HEAD~1 HEAD --name-only | grep '^container/'"
+# ORIG_HEAD zeigt auf den Stand vor dem Pull — korrekt auch bei mehreren gepullten Commits:
+ssh nanoclaw@VPS_IP "cd ~/nanoclaw && git diff ORIG_HEAD HEAD --name-only | grep '^container/'"
 
 # Falls ja — sauberer Rebuild (--no-cache allein reicht nicht wegen buildkit-Cache):
 ssh nanoclaw@VPS_IP "docker builder prune -f && cd ~/nanoclaw && ./container/build.sh"
