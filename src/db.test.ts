@@ -9,6 +9,7 @@ import {
   getMessagesSince,
   getNewMessages,
   getTaskById,
+  setGroupModel,
   setRegisteredGroup,
   storeChatMetadata,
   storeMessage,
@@ -480,5 +481,88 @@ describe('registered group isMain', () => {
     const group = groups['group@g.us'];
     expect(group).toBeDefined();
     expect(group.isMain).toBeUndefined();
+  });
+});
+
+// --- RegisteredGroup model round-trip ---
+
+describe('registered group model', () => {
+  it('persists model through set/get round-trip', () => {
+    setRegisteredGroup('tg:-1001@g.us', {
+      name: 'Telegram Main',
+      folder: 'telegram_main',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+      model: 'claude-opus-4-6',
+    });
+
+    const groups = getAllRegisteredGroups();
+    const group = groups['tg:-1001@g.us'];
+    expect(group).toBeDefined();
+    expect(group.model).toBe('claude-opus-4-6');
+  });
+
+  it('returns undefined model when not set', () => {
+    setRegisteredGroup('tg:-1002@g.us', {
+      name: 'Other Group',
+      folder: 'telegram_other',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+    });
+
+    const groups = getAllRegisteredGroups();
+    expect(groups['tg:-1002@g.us'].model).toBeUndefined();
+  });
+
+  it('setGroupModel updates model for existing group', () => {
+    setRegisteredGroup('tg:-1003@g.us', {
+      name: 'Group3',
+      folder: 'telegram_group3',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+    });
+
+    setGroupModel('telegram_group3', 'claude-haiku-4-5');
+
+    const groups = getAllRegisteredGroups();
+    expect(groups['tg:-1003@g.us'].model).toBe('claude-haiku-4-5');
+  });
+
+  it('setGroupModel with null resets to undefined (use default)', () => {
+    setRegisteredGroup('tg:-1004@g.us', {
+      name: 'Group4',
+      folder: 'telegram_group4',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+      model: 'claude-opus-4-6',
+    });
+
+    setGroupModel('telegram_group4', null);
+
+    const groups = getAllRegisteredGroups();
+    expect(groups['tg:-1004@g.us'].model).toBeUndefined();
+  });
+
+  it('model survives a setRegisteredGroup overwrite', () => {
+    setRegisteredGroup('tg:-1005@g.us', {
+      name: 'Group5',
+      folder: 'telegram_group5',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+      model: 'claude-opus-4-6',
+    });
+
+    // Overwrite with same model field present
+    setRegisteredGroup('tg:-1005@g.us', {
+      name: 'Group5 Updated',
+      folder: 'telegram_group5',
+      trigger: '@Andy',
+      added_at: '2024-01-01T00:00:00.000Z',
+      model: 'claude-opus-4-6',
+    });
+
+    const groups = getAllRegisteredGroups();
+    expect(groups['tg:-1005@g.us'].model).toBe('claude-opus-4-6');
+    expect(groups['tg:-1005@g.us'].name).toBe('Group5 Updated');
   });
 });
