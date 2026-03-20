@@ -436,6 +436,42 @@ export class TelegramChannel implements Channel {
       logger.debug({ jid, err }, 'Failed to send Telegram typing indicator');
     }
   }
+
+  async sendStatusMessage(chatJid: string, text: string): Promise<number | null> {
+    if (!this.bot) return null;
+    try {
+      const numericId = chatJid.replace(/^tg:/, '');
+      const msg = await this.bot.api.sendMessage(numericId, text);
+      return msg.message_id;
+    } catch (err) {
+      logger.debug({ chatJid, err }, 'Failed to send status message');
+      return null;
+    }
+  }
+
+  async editStatusMessage(chatJid: string, messageId: number, text: string): Promise<'ok' | 'not_found'> {
+    if (!this.bot) return 'ok';
+    try {
+      const numericId = chatJid.replace(/^tg:/, '');
+      await this.bot.api.editMessageText(numericId, messageId, text);
+      return 'ok';
+    } catch (err: any) {
+      const description: string = err?.description || err?.message || '';
+      if (description.includes('message to edit not found')) return 'not_found';
+      // 429 rate limit, "message is not modified", and other transient errors — ignore
+      return 'ok';
+    }
+  }
+
+  async deleteStatusMessage(chatJid: string, messageId: number): Promise<void> {
+    if (!this.bot) return;
+    try {
+      const numericId = chatJid.replace(/^tg:/, '');
+      await this.bot.api.deleteMessage(numericId, messageId);
+    } catch {
+      // Silently ignore all errors (message already deleted, etc.)
+    }
+  }
 }
 
 registerChannel('telegram', (opts: ChannelOpts) => {
