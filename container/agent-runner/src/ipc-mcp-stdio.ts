@@ -350,6 +350,8 @@ Pass "default" to reset to the system default (claude-sonnet-4-6).`,
     ),
   },
   async (args) => {
+    const resolvedTarget = isMain && args.target_folder ? args.target_folder : groupFolder;
+
     writeIpcFile(TASKS_DIR, {
       type: 'set_model',
       model: args.model === 'default' ? null : args.model,
@@ -358,7 +360,7 @@ Pass "default" to reset to the system default (claude-sonnet-4-6).`,
       timestamp: new Date().toISOString(),
     });
 
-    const target = args.target_folder ?? 'this group';
+    const target = resolvedTarget === groupFolder ? 'this group' : resolvedTarget;
     const modelName = args.model === 'default' ? 'system default' : args.model;
     return {
       content: [
