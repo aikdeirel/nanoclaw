@@ -132,6 +132,7 @@ describe('container-runner timeout behavior', () => {
 
     // Emit output with a result
     emitOutputMarker(fakeProc, {
+      type: 'result',
       status: 'success',
       result: 'Here is my response',
       newSessionId: 'session-123',
@@ -150,6 +151,7 @@ describe('container-runner timeout behavior', () => {
     await vi.advanceTimersByTimeAsync(10);
 
     const result = await resultPromise;
+    if (result.type !== 'result') throw new Error('Expected result type');
     expect(result.status).toBe('success');
     expect(result.newSessionId).toBe('session-123');
     expect(onOutput).toHaveBeenCalledWith(
@@ -175,7 +177,9 @@ describe('container-runner timeout behavior', () => {
     await vi.advanceTimersByTimeAsync(10);
 
     const result = await resultPromise;
+    if (result.type !== 'result') throw new Error('Expected result type');
     expect(result.status).toBe('error');
+    if (result.status !== 'error') throw new Error('Expected error status');
     expect(result.error).toContain('timed out');
     expect(onOutput).not.toHaveBeenCalled();
   });
@@ -191,6 +195,7 @@ describe('container-runner timeout behavior', () => {
 
     // Emit output
     emitOutputMarker(fakeProc, {
+      type: 'result',
       status: 'success',
       result: 'Done',
       newSessionId: 'session-456',
@@ -204,6 +209,7 @@ describe('container-runner timeout behavior', () => {
     await vi.advanceTimersByTimeAsync(10);
 
     const result = await resultPromise;
+    if (result.type !== 'result') throw new Error('Expected result type');
     expect(result.status).toBe('success');
     expect(result.newSessionId).toBe('session-456');
   });
