@@ -127,11 +127,15 @@ server.tool(
       'Model ID, e.g. "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001". ' +
       'Pass "default" to reset to the system default.'
     ),
+    target_folder: z.string().optional().describe(
+      '(Main group only) Folder name of the group to update. Defaults to the current group.'
+    ),
   },
   async (args) => {
     writeIpcFile(TASKS_DIR, {
       type: 'set_model',
       model: args.model === 'default' ? null : args.model,
+      targetFolder: args.target_folder,
       groupFolder,
       timestamp: new Date().toISOString(),
     });
@@ -148,23 +152,22 @@ New `case 'set_model'` in `processTaskIpc` in `src/ipc.ts`:
 
 ```typescript
 case 'set_model': {
-  // Authorization: a group can only set its own model.
-  // (The IPC directory identity is `sourceGroup`, so this is already enforced by
-  // the directory-based IPC security model — no extra check needed.)
-  deps.setRegisteredGroupModel(sourceGroup, data.model ?? null);
+  // Main can target any group via targetFolder; others can only set their own.
+  const targetFolder = isMain && data.targetFolder ? data.targetFolder : sourceGroup;
+  deps.setRegisteredGroupModel(targetFolder, data.model ?? null);
   break;
 }
 ```
 
-**Authorization policy:** A group can only set its own model. The main group cannot set another group's model via this tool — if that's needed in the future, a `targetFolder` field can be added. This is intentionally more restrictive than `register_group` (main-only) and consistent with task operations (each group manages its own).
+**Authorization policy:** A group can only set its own model. The main group can additionally set any group's model by providing `targetFolder` — consistent with how `schedule_task` uses `target_group_jid`.
 
 ### `processTaskIpc` type
 
-The `data` parameter type must include `model`:
+The `data` parameter type must include:
 
 ```typescript
-// existing fields...
 model?: string | null;
+targetFolder?: string;
 ```
 
 ### `IpcDeps` interface
