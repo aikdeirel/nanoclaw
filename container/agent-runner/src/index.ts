@@ -41,12 +41,10 @@ interface TextContentBlock {
 }
 type ContentBlock = ImageContentBlock | TextContentBlock;
 
-interface ContainerOutput {
-  status: 'success' | 'error';
-  result: string | null;
-  newSessionId?: string;
-  error?: string;
-}
+type ContainerOutput =
+  | { type: 'result'; status: 'success'; result: string | null; newSessionId?: string }
+  | { type: 'result'; status: 'error'; error: string; result?: string | null; newSessionId?: string }
+  | { type: 'status'; agentName: string; text: string };
 
 interface SessionEntry {
   sessionId: string;
@@ -137,6 +135,29 @@ function writeOutput(output: ContainerOutput): void {
 
 function log(message: string): void {
   console.error(`[agent-runner] ${message}`);
+}
+
+// Agent name tracking for status bubble
+const toolUseIdToAgentName = new Map<string, string>();
+const taskIdToAgentName = new Map<string, string>();
+
+function extractAgentName(input: Record<string, unknown>, fallbackId: string): string {
+  for (const key of ['description', 'task']) {
+    const val = input[key];
+    if (typeof val === 'string' && val.trim()) {
+      return val.trim().slice(0, 30);
+    }
+  }
+  return `agent-${fallbackId.slice(0, 6)}`;
+}
+
+function extractPrimaryString(input: Record<string, unknown>): string {
+  for (const val of Object.values(input)) {
+    if (typeof val === 'string' && val.trim()) {
+      return val.trim().slice(0, 80);
+    }
+  }
+  return JSON.stringify(input).slice(0, 80);
 }
 
 function getSessionSummary(sessionId: string, transcriptPath: string): string | null {
@@ -492,6 +513,42 @@ async function runQuery(
     if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
       const tn = message as { task_id: string; status: string; summary: string };
       log(`Task notification: task=${tn.task_id} status=${tn.status} summary=${tn.summary}`);
+      const agentName = taskIdToAgentName.get(tn.task_id);
+      if (agentName) {
+        writeOutput({ type: 'status', agentName, text: '' });
+        taskIdToAgentName.delete(tn.task_id);
+      }
+    }
+
+    // Emit status events for assistant messages (tool use and text)
+    if (message.type === 'assistant') {
+      const assistantMsg = message as { message?: { content?: unknown[] }; parent_tool_use_id?: string | null };
+      const content = assistantMsg.message?.content;
+      if (Array.isArray(content)) {
+        const parentId = assistantMsg.parent_tool_use_id;
+        const currentAgentName = (parentId && toolUseIdToAgentName.get(parentId)) || 'main';
+
+        for (const block of content) {
+          const b = block as { type: string; name?: string; id?: string; input?: Record<string, unknown>; text?: string };
+          if (b.type === 'tool_use') {
+            if ((b.name === 'Task' || b.name === 'TeamCreate') && b.id && b.input) {
+              const agentName = extractAgentName(b.input, b.id);
+              toolUseIdToAgentName.set(b.id, agentName);
+              const taskId = b.input.task_id;
+              if (typeof taskId === 'string') {
+                taskIdToAgentName.set(taskId, agentName);
+              }
+              taskIdToAgentName.set(b.id, agentName);
+            }
+            const primaryStr = b.input ? extractPrimaryString(b.input) : '';
+            const statusText = primaryStr ? `${b.name}: ${primaryStr}` : (b.name || 'tool');
+            writeOutput({ type: 'status', agentName: currentAgentName, text: statusText });
+          } else if (b.type === 'text' && b.text) {
+            const truncated = b.text.length > 80 ? b.text.slice(0, 80) + '...' : b.text;
+            writeOutput({ type: 'status', agentName: currentAgentName, text: truncated });
+          }
+        }
+      }
     }
 
     if (message.type === 'result') {
@@ -499,6 +556,7 @@ async function runQuery(
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
       log(`Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`);
       writeOutput({
+        type: 'result',
         status: 'success',
         result: textResult || null,
         newSessionId
@@ -521,6 +579,7 @@ async function main(): Promise<void> {
     log(`Received input for group: ${containerInput.groupFolder}`);
   } catch (err) {
     writeOutput({
+      type: 'result',
       status: 'error',
       result: null,
       error: `Failed to parse input: ${err instanceof Error ? err.message : String(err)}`
@@ -606,6 +665,7 @@ async function main(): Promise<void> {
           if (resultSubtype?.startsWith('error')) {
             hadError = true;
             writeOutput({
+              type: 'result',
               status: 'error',
               result: null,
               error: textResult || 'Session command failed.',
@@ -613,6 +673,7 @@ async function main(): Promise<void> {
             });
           } else {
             writeOutput({
+              type: 'result',
               status: 'success',
               result: textResult || 'Conversation compacted.',
               newSessionId: slashSessionId,
@@ -625,7 +686,7 @@ async function main(): Promise<void> {
       hadError = true;
       const errorMsg = err instanceof Error ? err.message : String(err);
       log(`Slash command error: ${errorMsg}`);
-      writeOutput({ status: 'error', result: null, error: errorMsg });
+      writeOutput({ type: 'result', status: 'error', result: null, error: errorMsg });
     }
 
     log(`Slash command done. compactBoundarySeen=${compactBoundarySeen}, hadError=${hadError}`);
@@ -638,6 +699,7 @@ async function main(): Promise<void> {
     // Only emit final session marker if no result was emitted yet and no error occurred
     if (!resultEmitted && !hadError) {
       writeOutput({
+        type: 'result',
         status: 'success',
         result: compactBoundarySeen
           ? 'Conversation compacted.'
@@ -646,7 +708,7 @@ async function main(): Promise<void> {
       });
     } else if (!hadError) {
       // Emit session-only marker so host updates session tracking
-      writeOutput({ status: 'success', result: null, newSessionId: slashSessionId });
+      writeOutput({ type: 'result', status: 'success', result: null, newSessionId: slashSessionId });
     }
     return;
   }
@@ -675,7 +737,7 @@ async function main(): Promise<void> {
       }
 
       // Emit session update so host can track it
-      writeOutput({ status: 'success', result: null, newSessionId: sessionId });
+      writeOutput({ type: 'result', status: 'success', result: null, newSessionId: sessionId });
 
       log('Query ended, waiting for next IPC message...');
 
@@ -693,6 +755,7 @@ async function main(): Promise<void> {
     const errorMessage = err instanceof Error ? err.message : String(err);
     log(`Agent error: ${errorMessage}`);
     writeOutput({
+      type: 'result',
       status: 'error',
       result: null,
       newSessionId: sessionId,
