@@ -81,12 +81,23 @@ class StatusBubble {
   ) {}
 
   async onStatus(agentName: string, text: string): Promise<void> {
+    if (text === '') {
+      await this.onAgentDone(agentName);
+      return;
+    }
     this.statuses.set(agentName, text);
     const rendered = this.renderText();
     if (this.messageId === null) {
-      this.messageId = await this.telegramChannel.sendStatusMessage(this.chatJid, rendered);
+      this.messageId = await this.telegramChannel.sendStatusMessage(
+        this.chatJid,
+        rendered,
+      );
     } else {
-      const result = await this.telegramChannel.editStatusMessage(this.chatJid, this.messageId, rendered);
+      const result = await this.telegramChannel.editStatusMessage(
+        this.chatJid,
+        this.messageId,
+        rendered,
+      );
       if (result === 'not_found') {
         this.messageId = null;
       }
@@ -98,13 +109,20 @@ class StatusBubble {
     if (this.statuses.size === 0) {
       await this.delete();
     } else if (this.messageId !== null) {
-      await this.telegramChannel.editStatusMessage(this.chatJid, this.messageId, this.renderText());
+      await this.telegramChannel.editStatusMessage(
+        this.chatJid,
+        this.messageId,
+        this.renderText(),
+      );
     }
   }
 
   async delete(): Promise<void> {
     if (this.messageId !== null) {
-      await this.telegramChannel.deleteStatusMessage(this.chatJid, this.messageId);
+      await this.telegramChannel.deleteStatusMessage(
+        this.chatJid,
+        this.messageId,
+      );
       this.messageId = null;
     }
   }
@@ -210,9 +228,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     return true;
   }
 
-  const bubble = channel instanceof TelegramChannel
-    ? new StatusBubble(chatJid, channel)
-    : null;
+  const bubble =
+    channel instanceof TelegramChannel
+      ? new StatusBubble(chatJid, channel)
+      : null;
 
   const isMainGroup = group.isMain === true;
 
@@ -356,7 +375,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   if (idleTimer) clearTimeout(idleTimer);
 
   if (output === 'error' || hadError) {
-    await bubble?.delete();  // Clean up status bubble on error
+    await bubble?.delete(); // Clean up status bubble on error
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
