@@ -474,7 +474,10 @@ export async function processTaskIpc(
       const targetFolder =
         isMain && data.targetFolder ? data.targetFolder : sourceGroup;
       deps.setRegisteredGroupModel(targetFolder, data.model ?? null);
-      logger.info({ targetFolder, model: data.model ?? null, sourceGroup }, 'Model updated via IPC');
+      logger.info(
+        { targetFolder, model: data.model ?? null, sourceGroup },
+        'Model updated via IPC',
+      );
       break;
     }
 

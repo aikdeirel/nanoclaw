@@ -657,13 +657,20 @@ describe('processTaskIpc set_model', () => {
     };
 
     await processTaskIpc(
-      { type: 'set_model', model: 'claude-opus-4-6', groupFolder: 'telegram_main' },
+      {
+        type: 'set_model',
+        model: 'claude-opus-4-6',
+        groupFolder: 'telegram_main',
+      },
       'telegram_main',
       false,
       localDeps,
     );
 
-    expect(calledWith).toEqual({ folder: 'telegram_main', model: 'claude-opus-4-6' });
+    expect(calledWith).toEqual({
+      folder: 'telegram_main',
+      model: 'claude-opus-4-6',
+    });
   });
 
   it('main can set model for another group via targetFolder', async () => {
@@ -683,13 +690,21 @@ describe('processTaskIpc set_model', () => {
     };
 
     await processTaskIpc(
-      { type: 'set_model', model: 'claude-haiku-4-5', targetFolder: 'telegram_other', groupFolder: 'main' },
+      {
+        type: 'set_model',
+        model: 'claude-haiku-4-5',
+        targetFolder: 'telegram_other',
+        groupFolder: 'main',
+      },
       'main',
       true,
       localDeps,
     );
 
-    expect(calledWith).toEqual({ folder: 'telegram_other', model: 'claude-haiku-4-5' });
+    expect(calledWith).toEqual({
+      folder: 'telegram_other',
+      model: 'claude-haiku-4-5',
+    });
   });
 
   it('non-main cannot target another group', async () => {
@@ -709,14 +724,22 @@ describe('processTaskIpc set_model', () => {
     };
 
     await processTaskIpc(
-      { type: 'set_model', model: 'claude-opus-4-6', targetFolder: 'telegram_other', groupFolder: 'telegram_main' },
+      {
+        type: 'set_model',
+        model: 'claude-opus-4-6',
+        targetFolder: 'telegram_other',
+        groupFolder: 'telegram_main',
+      },
       'telegram_main',
       false,
       localDeps,
     );
 
     // targetFolder ignored for non-main; updates own group
-    expect(calledWith).toEqual({ folder: 'telegram_main', model: 'claude-opus-4-6' });
+    expect(calledWith).toEqual({
+      folder: 'telegram_main',
+      model: 'claude-opus-4-6',
+    });
   });
 
   it('resets to null when model is null (MCP tool converts "default" → null before writing IPC)', async () => {

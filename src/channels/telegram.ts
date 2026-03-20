@@ -437,7 +437,10 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async sendStatusMessage(chatJid: string, text: string): Promise<number | null> {
+  async sendStatusMessage(
+    chatJid: string,
+    text: string,
+  ): Promise<number | null> {
     if (!this.bot) return null;
     try {
       const numericId = chatJid.replace(/^tg:/, '');
@@ -449,7 +452,11 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async editStatusMessage(chatJid: string, messageId: number, text: string): Promise<'ok' | 'not_found'> {
+  async editStatusMessage(
+    chatJid: string,
+    messageId: number,
+    text: string,
+  ): Promise<'ok' | 'not_found'> {
     if (!this.bot) return 'ok';
     try {
       const numericId = chatJid.replace(/^tg:/, '');

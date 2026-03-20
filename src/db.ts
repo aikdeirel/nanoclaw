@@ -609,9 +609,10 @@ export function setRegisteredGroup(jid: string, group: RegisteredGroup): void {
 }
 
 export function setGroupModel(folder: string, model: string | null): void {
-  db.prepare(
-    `UPDATE registered_groups SET model = ? WHERE folder = ?`,
-  ).run(model, folder);
+  db.prepare(`UPDATE registered_groups SET model = ? WHERE folder = ?`).run(
+    model,
+    folder,
+  );
 }
 
 export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
