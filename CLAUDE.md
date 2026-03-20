@@ -21,6 +21,10 @@ Single Node.js process with skill-based channel system. Channels (WhatsApp, Tele
 | `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
 | `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
 
+## Fork Documentation
+
+When completing a new feature or integration that diverges from upstream, update `docs/fork-features.md` with a new entry covering: brief description, relevant files, and whether it extends or modifies existing functionality.
+
 ## Skills
 
 | Skill | When to Use |
