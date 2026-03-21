@@ -104,14 +104,34 @@ ssh nanoclaw@VPS_IP "
 
 > **Hinweis:** `bash -l` lädt nvm nicht zuverlässig. Immer explizit `source $NVM_DIR/nvm.sh` verwenden.
 
-Container nur neu bauen wenn sich Container-Dateien geändert haben:
+Container neu bauen wenn sich Container-Dateien geändert haben:
 ```bash
 # ORIG_HEAD zeigt auf den Stand vor dem Pull — korrekt auch bei mehreren gepullten Commits:
 ssh nanoclaw@VPS_IP "cd ~/nanoclaw && git diff ORIG_HEAD HEAD --name-only | grep '^container/'"
-
-# Falls ja — sauberer Rebuild (--no-cache allein reicht nicht wegen buildkit-Cache):
-ssh nanoclaw@VPS_IP "docker builder prune -f && cd ~/nanoclaw && ./container/build.sh"
 ```
+
+Falls Änderungen in `container/` → **vollständigen Rebuild ohne Cache** durchführen:
+```bash
+# --no-cache allein reicht nicht — Docker Image Layer Cache bleibt intakt.
+# Einziger sicherer Weg: docker build --no-cache direkt aufrufen:
+ssh nanoclaw@VPS_IP "cd ~/nanoclaw && docker build --no-cache -t nanoclaw-agent:latest -f container/Dockerfile container/"
+```
+
+> **Warum nicht `./container/build.sh`?** Das Skript ruft `docker builder prune -f` auf, leert aber nur den BuildKit-Metadaten-Cache. Der Docker Image Layer Cache bleibt intakt — Steps wie `npm install -g @anthropic-ai/claude-code` werden trotzdem als `CACHED` übersprungen. `--no-cache` beim `docker build`-Aufruf ist der einzig zuverlässige Weg.
+
+### Laufende Container mit altem Image stoppen
+
+Nach einem Rebuild laufen eventuell noch Container vom alten Image weiter — z.B. lang laufende Agenten-Konversationen. Diese müssen manuell gestoppt werden:
+
+```bash
+# Alle laufenden Container und ihre Images anzeigen:
+ssh nanoclaw@VPS_IP "docker ps --format 'ID: {{.ID}} Image: {{.Image}} Created: {{.CreatedAt}} Status: {{.Status}}'"
+
+# Container mit altem Image-Hash (nicht "nanoclaw-agent:latest") stoppen:
+ssh nanoclaw@VPS_IP "docker stop <CONTAINER_ID> && docker rm <CONTAINER_ID>"
+```
+
+> **Symptom wenn vergessen:** Änderungen am Container-Code (z.B. entfernte Emojis) haben keinen Effekt, obwohl der Build erfolgreich war und `nanoclaw-agent:latest` das neue Image referenziert — der alte Container läuft einfach weiter.
 
 ## Schritt 4: Daten-Sync (Szenarien 2 und 3)
 
@@ -211,7 +231,8 @@ ssh nanoclaw@VPS_IP "
 - [ ] Situation analysiert (Code-Stand, DB-Stand)
 - [ ] Service gestoppt
 - [ ] (Code) git pull + npm install + build erfolgreich
-- [ ] (Code) Container neu gebaut falls container/ geändert
+- [ ] (Code) Container neu gebaut falls container/ geändert (`docker build --no-cache`)
+- [ ] (Code) Alte laufende Container mit altem Image gestoppt (`docker ps` prüfen)
 - [ ] (Daten) .env übertragen
 - [ ] (Daten) store/messages.db nach `store/` übertragen
 - [ ] (Daten) groups/ übertragen (ohne logs/)
