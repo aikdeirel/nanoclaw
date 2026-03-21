@@ -551,7 +551,7 @@ async function runQuery(
         if (ev.content_block?.type === 'tool_use' && ev.content_block.name) {
           writeOutput({ type: 'status', agentName: currentAgentName, text: ev.content_block.name });
         } else if (ev.content_block?.type === 'thinking') {
-          writeOutput({ type: 'status', agentName: currentAgentName, text: '💭 ...' });
+          writeOutput({ type: 'status', agentName: currentAgentName, text: '...' });
         }
       }
 
@@ -569,8 +569,7 @@ async function runQuery(
         if (grown >= STREAM_THROTTLE_CHARS) {
           streamStatusLastEmitLen = streamStatusLastText.length;
           const snippet = streamStatusLastText.slice(-80); // last 80 chars = most recent context
-          const label = delta.type === 'thinking_delta' ? '💭' : delta.type === 'input_json_delta' ? '⚙️' : '✍️';
-          writeOutput({ type: 'status', agentName: currentAgentName, text: `${label} ${snippet}` });
+          writeOutput({ type: 'status', agentName: currentAgentName, text: snippet });
         }
       }
     }
